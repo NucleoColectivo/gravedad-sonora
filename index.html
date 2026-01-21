@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTFå-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malla de Gravedad Sonora 3.0 (Turbo)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020205;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Prevenir scroll rebote en móviles */
+            overscroll-behavior: none;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        /* UI Layer Styles */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1rem; /* Padding responsive base */
+            box-sizing: border-box;
+        }
+        .hud-panel {
+            background: rgba(10, 10, 20, 0.7);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            pointer-events: auto;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .hud-panel:hover {
+            border-color: rgba(0, 255, 255, 0.6);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.15);
+        }
+        
+        /* Start Screen */
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(20,20,40,0.95), #000);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            pointer-events: auto;
+            padding: 20px;
+        }
+        
+        /* Custom Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            margin: 8px 0;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #00ffcc;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px #00ffcc;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+
+        /* Buttons & Text */
+        .glow-text {
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        button.start-btn {
+            background: linear-gradient(90deg, #00c6ff, #0072ff);
+            border: none;
+            padding: 15px 40px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 20px rgba(0, 114, 255, 0.4);
+            margin-top: 30px;
+            letter-spacing: 2px;
+            max-width: 100%;
+        }
+        button.start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(0, 198, 255, 0.6);
+        }
+        
+        #hidden-video { display: none; }
+        
+        .control-group {
+            margin-bottom: 12px;
+        }
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+
+        /* Animación de colapso */
+        .collapsible-content {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            max-height: 500px; /* Altura máxima suficiente */
+            opacity: 1;
+            overflow: hidden;
+        }
+        .collapsed .collapsible-content {
+            max-height: 0;
+            opacity: 0;
+            margin-bottom: 0;
+        }
+        .toggle-icon {
+            transition: transform 0.3s ease;
+        }
+        .collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Video oculto -->
+    <video id="hidden-video" autoplay playsinline muted></video>
+
+    <!-- Canvas principal -->
+    <canvas id="simulation"></canvas>
+
+    <!-- Pantalla de Inicio -->
+    <div id="start-screen">
+        <h1 class="text-4xl md:text-7xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-purple-400 glow-text">
+            SONIDO & GRAVEDAD
+        </h1>
+        <p class="text-lg md:text-xl text-cyan-200 tracking-widest mb-8">VERSION DE ALTA VELOCIDAD</p>
+        
+        <div class="max-w-md w-full text-gray-300 space-y-4 px-6 text-sm md:text-base bg-black/30 p-6 rounded-xl border border-white/10 backdrop-blur-sm">
+            <p>🚀 <b>Optimizado:</b> Respuesta inmediata al sonido y movimiento.</p>
+            <p>🎵 <b>Audio Reactivo:</b> Detecta graves y agudos con mayor precisión.</p>
+            <p>📷 <b>Gravedad Visual:</b> Tu movimiento deforma el espacio en tiempo real.</p>
+        </div>
+        
+        <button id="start-btn" class="start-btn">ACTIVAR SISTEMA</button>
+    </div>
+
+    <!-- Interfaz HUD -->
+    <div id="ui-layer" style="display: none;">
+        <!-- Panel Izquierdo: Controles (Minimizable y Responsive) -->
+        <div id="controls-panel" class="hud-panel w-full max-w-[280px] sm:w-72 mt-2 sm:mt-4 ml-0 sm:ml-4">
+            <div class="flex justify-between items-center border-b border-white/10 pb-2 mb-3 cursor-pointer group" id="toggle-header">
+                <h3 class="text-cyan-400 font-bold text-sm select-none group-hover:text-cyan-300 transition-colors">CALIBRACIÓN</h3>
+                <svg class="w-4 h-4 text-cyan-400 toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </div>
+            
+            <div class="collapsible-content">
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Sensibilidad Audio (Gain)</span>
+                        <span id="val-audio">250</span>
+                    </div>
+                    <input type="range" min="0" max="500" value="250" id="inp-audio">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Fuerza Gravitatoria (Video)</span>
+                        <span id="val-video">120</span>
+                    </div>
+                    <input type="range" min="0" max="300" value="120" id="inp-video">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Tensión de Malla</span>
+                        <span id="val-tension">0.03</span>
+                    </div>
+                    <input type="range" min="0.005" max="0.1" step="0.005" value="0.03" id="inp-tension">
+                </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Fricción</span>
+                        <span id="val-damp">0.92</span>
+                    </div>
+                    <input type="range" min="0.80" max="0.99" step="0.01" value="0.92" id="inp-damp">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel Derecho: Stats -->
+        <div class="hud-panel self-end w-auto min-w-[150px] mr-0 sm:mr-4 mb-2 sm:mb-4 text-right">
+            <div class="text-[10px] sm:text-xs text-gray-400 mb-1">FRECUENCIA ACTIVA</div>
+            <div class="text-xl sm:text-2xl font-mono text-white mb-2 sm:mb-3"><span id="freq-val">0</span> <span class="text-xs sm:text-sm text-gray-500">Hz</span></div>
+            
+            <div class="text-[10px] sm:text-xs text-gray-400 mb-1">AMPLITUD DE SEÑAL</div>
+            <div class="h-2 w-24 sm:w-32 bg-gray-700 rounded-full overflow-hidden ml-auto">
+                <div id="bar-intensity" class="h-full bg-gradient-to-r from-cyan-400 to-purple-500 w-0 transition-all duration-75"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * CONFIGURACIÓN OPTIMIZADA
+         */
+        const CONFIG = {
+            gridSize: 35,        
+            perspective: 800,    
+            baseZ: 250,          
+            dampening: 0.92,     
+            tension: 0.03,       
+            videoInfluence: 120, 
+            audioInfluence: 250, 
+            blackHoleMass: 800,
+            smoothing: 0.5       
+        };
+
+        // Variables Globales
+        let canvas, ctx;
+        let width, height;
+        let points = [];
+        let stars = []; 
+        let audioContext, analyser, microphone, dataArray;
+        let videoElement, videoCanvas, videoCtx;
+        let isRunning = false;
+        let dominantFrequency = 0;
+        let averageVolume = 0;
+        
+        // Mouse / Touch
+        let mouseX = -9999;
+        let mouseY = -9999;
+
+        // Elementos DOM
+        const startScreen = document.getElementById('start-screen');
+        const uiLayer = document.getElementById('ui-layer');
+        const startBtn = document.getElementById('start-btn');
+        const hiddenVideo = document.getElementById('hidden-video');
+
+        // Toggle Logic
+        const toggleHeader = document.getElementById('toggle-header');
+        const controlsPanel = document.getElementById('controls-panel');
+        
+        toggleHeader.addEventListener('click', () => {
+            controlsPanel.classList.toggle('collapsed');
+        });
+
+        // Inputs
+        const inpAudio = document.getElementById('inp-audio');
+        const inpVideo = document.getElementById('inp-video');
+        const inpTension = document.getElementById('inp-tension');
+        const inpDamp = document.getElementById('inp-damp');
+
+        /**
+         * CLASE STAR
+         */
+        class Star {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = (Math.random() - 0.5) * width * 2; 
+                this.y = (Math.random() - 0.5) * height * 2;
+                this.z = Math.random() * 2000 + 500; 
+                this.size = Math.random() * 2;
+            }
+            update(speed) {
+                this.z -= speed;
+                if (this.z <= 1) this.reset();
+            }
+            draw() {
+                const scale = CONFIG.perspective / (CONFIG.perspective + this.z);
+                const sx = (this.x) * scale + width/2;
+                const sy = (this.y) * scale + height/2;
+                
+                // Si la estrella está fuera de pantalla, no dibujar (optimización)
+                if (sx < 0 || sx > width || sy < 0 || sy > height) return;
+
+                const opacity = Math.min(1, (2000 - this.z)/1000);
+                
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(sx, sy, this.size * scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        /**
+         * CLASE PUNTO
+         */
+        class Point {
+            constructor(x, y, z) {
+                this.baseX = x;
+                this.baseY = y;
+                this.baseZ = z;
+                
+                this.currentZ = z;
+                this.velocityZ = 0;
+                this.lastForceType = 0; 
+            }
+
+            update() {
+                // 1. Física de Resortes
+                const displacement = this.currentZ - this.baseZ;
+                const force = -CONFIG.tension * displacement;
+                
+                this.velocityZ += force;
+                this.velocityZ *= CONFIG.dampening;
+                this.currentZ += this.velocityZ;
+
+                // 2. Interacción Mouse (Distancia simple para performance)
+                if (mouseX > 0) {
+                    const scale = CONFIG.perspective / (CONFIG.perspective + this.currentZ + CONFIG.baseZ);
+                    const screenX = (this.baseX - width/2) * scale + width/2;
+                    const screenY = (this.baseY - height/2) * scale + height/2;
+                    
+                    const dx = screenX - mouseX;
+                    const dy = screenY - mouseY;
+                    
+                    // Comprobación rápida de caja antes de raíz cuadrada
+                    if (Math.abs(dx) < 200 && Math.abs(dy) < 200) {
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < 200) {
+                            const pull = (1 - dist/200) * CONFIG.blackHoleMass;
+                            this.velocityZ += pull * 0.5; 
+                        }
+                    }
+                }
+            }
+
+            applyForce(force, type) {
+                this.velocityZ += force;
+                this.lastForceType = this.lastForceType * 0.8 + type * 0.2; // Transición más rápida
+            }
+        }
+
+        /**
+         * SETUP
+         */
+        function init() {
+            canvas = document.getElementById('simulation');
+            ctx = canvas.getContext('2d', { alpha: false }); // Optimización alpha
+            videoCanvas = document.createElement('canvas');
+            videoCtx = videoCanvas.getContext('2d', { willReadFrequently: true }); // Optimización lectura
+
+            resize();
+            createWorld();
+            setupControls();
+            
+            window.addEventListener('resize', resize);
+            window.addEventListener('mousemove', e => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+            window.addEventListener('touchmove', e => {
+                mouseX = e.touches[0].clientX;
+                mouseY = e.touches[0].clientY;
+            }, {passive: false});
+            window.addEventListener('touchend', () => {
+                mouseX = -9999;
+            });
+
+            startBtn.addEventListener('click', startExperience);
+        }
+
+        function setupControls() {
+            const updateLabel = (id, val) => document.getElementById(id).innerText = val;
+
+            inpAudio.addEventListener('input', (e) => {
+                CONFIG.audioInfluence = parseFloat(e.target.value);
+                updateLabel('val-audio', CONFIG.audioInfluence);
+            });
+            inpVideo.addEventListener('input', (e) => {
+                CONFIG.videoInfluence = parseFloat(e.target.value);
+                updateLabel('val-video', CONFIG.videoInfluence);
+            });
+            inpTension.addEventListener('input', (e) => {
+                CONFIG.tension = parseFloat(e.target.value);
+                updateLabel('val-tension', CONFIG.tension);
+            });
+            inpDamp.addEventListener('input', (e) => {
+                CONFIG.dampening = parseFloat(e.target.value);
+                updateLabel('val-damp', CONFIG.dampening);
+            });
+        }
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            if(points.length > 0) createWorld();
+        }
+
+        function createWorld() {
+            points = [];
+            stars = [];
+
+            const range = Math.max(width, height) * 1.5;
+            const step = range / CONFIG.gridSize;
+            
+            // Centrado perfecto
+            const totalGridSize = step * (CONFIG.gridSize - 1);
+            const offsetX = (width - totalGridSize) / 2;
+            const offsetY = (height - totalGridSize) / 2;
+
+            for (let y = 0; y < CONFIG.gridSize; y++) {
+                for (let x = 0; x < CONFIG.gridSize; x++) {
+                    const pX = (x - CONFIG.gridSize/2) * step + width/2;
+                    const pY = (y - CONFIG.gridSize/2) * step + height/2;
+                    points.push(new Point(pX, pY, 0));
+                }
+            }
+
+            for(let i=0; i<150; i++) stars.push(new Star()); // Menos estrellas para más rendimiento
+        }
+
+        async function startExperience() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 512; // Mejor resolución de frecuencia
+                analyser.smoothingTimeConstant = CONFIG.smoothing; // Más reactivo (0.5 vs 0.8)
+                analyser.minDecibels = -90;
+                analyser.maxDecibels = -10;
+                
+                const streamAudio = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        echoCancellation: false, 
+                        noiseSuppression: false, // Queremos todo el audio crudo
+                        autoGainControl: false 
+                    } 
+                });
+                microphone = audioContext.createMediaStreamSource(streamAudio);
+                microphone.connect(analyser);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                const streamVideo = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 320 }, // Pedir baja res para mejor performance
+                        height: { ideal: 240 },
+                        frameRate: { ideal: 30 }
+                    } 
+                });
+                hiddenVideo.srcObject = streamVideo;
+                
+                hiddenVideo.onloadedmetadata = () => {
+                    videoCanvas.width = CONFIG.gridSize;
+                    videoCanvas.height = CONFIG.gridSize;
+                };
+
+                startScreen.style.opacity = '0';
+                setTimeout(() => startScreen.style.display = 'none', 800);
+                uiLayer.style.display = 'flex';
+                isRunning = true;
+                animate();
+
+            } catch (err) {
+                console.error(err);
+                startBtn.innerText = "ERROR DE ACCESO";
+                startBtn.style.background = "red";
+                // alert("Error de acceso: " + err.message); // Disable alert for best practice
+            }
+        }
+
+        function analyzeAudio() {
+            analyser.getByteFrequencyData(dataArray);
+
+            let sum = 0;
+            let maxVal = 0;
+            let maxIndex = 0;
+
+            // Recorremos solo el rango audible útil (no todo el array)
+            const usefulLength = Math.floor(dataArray.length * 0.8);
+            
+            for (let i = 0; i < usefulLength; i++) {
+                const val = dataArray[i];
+                sum += val;
+                if (val > maxVal) {
+                    maxVal = val;
+                    maxIndex = i;
+                }
+            }
+            
+            // Promedio más sensible (potencia cuadrada para enfatizar picos)
+            averageVolume = sum / usefulLength;
+            
+            const nyquist = audioContext.sampleRate / 2;
+            dominantFrequency = maxIndex * (nyquist / dataArray.length);
+
+            // Update UI (Throttled visuals slightly not needed here due to RAF)
+            document.getElementById('freq-val').innerText = Math.round(dominantFrequency);
+            document.getElementById('bar-intensity').style.width = Math.min(100, averageVolume * 2.0) + '%';
+        }
+
+        function getNoteColor(freq, volume) {
+            let h, s, l;
+            
+            // Colores más saturados y vibrantes
+            if (freq < 120) { 
+                h = 0 + (freq/120)*40; // Rojo fuego a Dorado
+                s = 100;
+                l = 50 + (volume/255)*30;
+            } else if (freq < 500) { 
+                h = 40 + ((freq-120)/380)*100; // Dorado a Verde neón
+                s = 90;
+                l = 60;
+            } else if (freq < 2500) { 
+                h = 140 + ((freq-500)/2000)*60; // Verde a Cian
+                s = 95;
+                l = 65;
+            } else { 
+                h = 200 + Math.min(80, ((freq-2500)/5000)*80); // Cian a Violeta Eléctrico
+                s = 100;
+                l = 75;
+            }
+
+            return { h, s, l };
+        }
+
+        function animate() {
+            if (!isRunning) return;
+            requestAnimationFrame(animate);
+
+            // 1. Clear - Usamos fillRect sin transparencia para mejor performance si es posible, 
+            // pero queremos el efecto trail, así que usamos un alpha más bajo.
+            ctx.fillStyle = '#020205'; // Fondo sólido primero (reset)
+            ctx.fillRect(0,0,width,height);
+            
+            // Para efecto trail, dibujamos un rect semi-transparente sobre el frame anterior?
+            // No, el método más rápido es limpiar y redibujar todo, o usar un rect negro con poca opacidad.
+            // Para esta versión rápida, limpiamos todo y redibujamos. El trail se siente "lento".
+            // Si queremos trail:
+            // ctx.fillStyle = 'rgba(2, 2, 5, 0.4)';
+            // ctx.fillRect(0, 0, width, height);
+
+            analyzeAudio();
+
+            // 2. Estrellas
+            const starSpeed = 4 + (averageVolume / 255) * 50; // Más rápido!
+            for (const star of stars) {
+                star.update(starSpeed);
+                star.draw();
+            }
+
+            // 3. Procesar Video e Imagen
+            let frameData = null;
+            if (hiddenVideo.readyState === hiddenVideo.HAVE_ENOUGH_DATA) {
+                videoCtx.drawImage(hiddenVideo, 0, 0, CONFIG.gridSize, CONFIG.gridSize);
+                frameData = videoCtx.getImageData(0, 0, CONFIG.gridSize, CONFIG.gridSize).data;
+            }
+
+            const globalColor = getNoteColor(dominantFrequency, averageVolume);
+            const time = Date.now() * 0.003; // Tiempo más rápido
+
+            // PRE-CALCULATE reusable values
+            const volFactor = averageVolume / 255;
+            const audioForceBase = volFactor * CONFIG.audioInfluence;
+            const isHighFreq = dominantFrequency > 600;
+
+            let pIndex = 0;
+            
+            // ARRAY DE PUNTOS PROYECTADOS (Para evitar recalcular en el loop de dibujo)
+            const projectedPoints = new Array(points.length);
+
+            // LOOP DE FÍSICA Y PROYECCIÓN
+            for (let y = 0; y < CONFIG.gridSize; y++) {
+                for (let x = 0; x < CONFIG.gridSize; x++) {
+                    const p = points[pIndex];
+
+                    // --- FÍSICA ---
+                    
+                    // A. VIDEO
+                    if (frameData) {
+                        const pixelX = CONFIG.gridSize - 1 - x;
+                        const pIx = (y * CONFIG.gridSize + pixelX) * 4;
+                        // Solo canal verde para velocidad (aproximación de brillo)
+                        const brightness = frameData[pIx+1]; 
+                        
+                        if (brightness > 40) {
+                            const gravityForce = (brightness / 255) * CONFIG.videoInfluence;
+                            p.applyForce(gravityForce * 0.6, -1); 
+                        }
+                    }
+
+                    // B. AUDIO
+                    // Usamos una función de ruido más simple
+                    const noise = Math.sin(x * 0.4 + time) * Math.cos(y * 0.4 + time);
+                    
+                    if (isHighFreq) {
+                        let f = -audioForceBase * 0.8; 
+                        if (Math.random() > 0.7) f *= 1.4; // Sparkles
+                        p.applyForce(f * Math.abs(noise), 1);
+                    } else {
+                        // Bass kick
+                        p.applyForce(audioForceBase * 0.6 * noise, -1);
+                    }
+
+                    p.update();
+                    
+                    // --- PROYECCIÓN ---
+                    const scale = CONFIG.perspective / (CONFIG.perspective + p.currentZ + CONFIG.baseZ);
+                    projectedPoints[pIndex] = {
+                        x: (p.baseX - width/2) * scale + width/2,
+                        y: (p.baseY - height/2) * scale + height/2,
+                        z: p.currentZ,
+                        scale: scale,
+                        colorVal: p.lastForceType
+                    };
+
+                    pIndex++;
+                }
+            }
+
+            // LOOP DE DIBUJO OPTIMIZADO
+            ctx.lineWidth = 1.5; // Líneas un poco más gruesas
+            
+            for (let y = 0; y < CONFIG.gridSize; y++) {
+                for (let x = 0; x < CONFIG.gridSize; x++) {
+                    const i = y * CONFIG.gridSize + x;
+                    const pp = projectedPoints[i];
+
+                    // FIX: Evitar dibujar puntos detrás de la cámara (escala negativa)
+                    if (pp.scale <= 0) continue;
+
+                    // Solo dibujar si está en pantalla
+                    if (pp.x < -50 || pp.x > width + 50 || pp.y < -50 || pp.y > height + 50) continue;
+
+                    const displacement = Math.abs(pp.z);
+                    
+                    // Color dinámico
+                    let lineHue = 200; 
+                    let lineAlpha = 0.2;
+
+                    if (displacement > 15 || volFactor > 0.1) {
+                        lineAlpha = Math.min(1, 0.2 + (displacement / 80) + volFactor * 0.5);
+                        // Mezcla entre azul base y el color del sonido
+                        lineHue = globalColor.h; 
+                    }
+
+                    ctx.strokeStyle = `hsla(${lineHue}, 85%, 60%, ${lineAlpha})`;
+
+                    // Dibujar conexiones
+                    ctx.beginPath();
+                    
+                    // Derecha
+                    if (x < CONFIG.gridSize - 1) {
+                        const pn = projectedPoints[i+1];
+                        // FIX ADICIONAL: Verificar que el vecino también sea visible
+                        if (pn && pn.scale > 0) {
+                            ctx.moveTo(pp.x, pp.y);
+                            ctx.lineTo(pn.x, pn.y);
+                        }
+                    }
+                    // Abajo
+                    if (y < CONFIG.gridSize - 1) {
+                        const pb = projectedPoints[i+CONFIG.gridSize];
+                        if (pb && pb.scale > 0) {
+                            ctx.moveTo(pp.x, pp.y); 
+                            ctx.lineTo(pb.x, pb.y);
+                        }
+                    }
+                    ctx.stroke();
+
+                    // Nodos
+                    if (displacement > 10 || volFactor > 0.15) {
+                        // FIX: Evitar radio negativo con Math.max(0, ...)
+                        const radius = Math.max(0, (pp.scale * 3) + (displacement / 30));
+                        
+                        ctx.beginPath();
+                        ctx.arc(pp.x, pp.y, radius, 0, Math.PI * 2);
+                        
+                        if (pp.colorVal > 0.5) { // Antigravedad
+                            ctx.fillStyle = `hsla(${globalColor.h}, 100%, 85%, 0.9)`;
+                        } else { // Gravedad
+                            ctx.fillStyle = `hsla(${displacement > 40 ? 0 : 260}, 90%, 60%, 0.9)`;
+                        }
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Cursor Agujero Negro
+            if (mouseX > 0) {
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, 20, 0, Math.PI*2);
+                ctx.strokeStyle = `rgba(255, 255, 255, 0.8)`;
+                ctx.stroke();
+            }
+        }
+        
+        window.onload = init;
+
+    </script>
+</body>
+</html>
